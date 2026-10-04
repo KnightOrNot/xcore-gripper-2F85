@@ -1,16 +1,19 @@
 [project]
 name = "gripper-2f85"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Control a Robotiq 2F-85 gripper through a small TCP JSON server"
 readme = "README.md"
 authors = [
     { name = "RightOrNot", email = "jue1251665735@outlook.com" }
 ]
-requires-python = ">=3.11"
-dependencies = []
+requires-python = ">=3.9"
+dependencies = [
+    "pyserial>=3.5",
+]
 
 [project.scripts]
-gripper-2f85 = "gripper_2f85:main"
+gripper = "gripper_2f85.cli:main"
+gripper-server = "gripper_2f85.gripper_server:main"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]

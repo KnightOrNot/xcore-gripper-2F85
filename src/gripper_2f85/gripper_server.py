@@ -7,6 +7,7 @@ The control PC can then send JSON commands over the network.
 
 import argparse
 import json
+import os
 import socketserver
 import threading
 import time
@@ -14,18 +15,40 @@ from typing import Any, Dict, Optional, Tuple
 
 import serial.tools.list_ports
 
-import robtiq_gripper_mdbsrtu as GRP
+try:  # installed package
+    from gripper_2f85 import robtiq_gripper_mdbsrtu as GRP
+except ImportError:  # executed as a loose script from src/gripper_2f85/
+    import robtiq_gripper_mdbsrtu as GRP  # type: ignore[no-redef]
 
 
 MOVING_STATUS = 0x39
 
 
 def find_usb_serial_port() -> Optional[str]:
+    """Return the first USB serial adapter, or ``None`` when there is none.
+
+    Deliberately does not fall back to hardware ``/dev/ttyS*`` ports: opening
+    one by accident reports a confusing permission error instead of the real
+    problem (the gripper USB adapter is not plugged in).
+    """
+
     ports = list(serial.tools.list_ports.comports())
-    for port_no, description, _address in ports:
-        if "USB" in description or "USB" in port_no:
-            return port_no
-    return ports[0].device if ports else None
+    for info in ports:
+        device = getattr(info, "device", str(info))
+        description = " ".join(
+            str(getattr(info, field, "") or "")
+            for field in ("description", "hwid", "manufacturer", "product")
+        )
+        if "USB" in description.upper() or "USB" in device.upper():
+            return device
+    return None
+
+
+def list_serial_ports() -> str:
+    ports = list(serial.tools.list_ports.comports())
+    if not ports:
+        return "none"
+    return ", ".join(getattr(info, "device", str(info)) for info in ports)
 
 
 def clamp_byte(value: Any, name: str) -> int:
@@ -175,7 +198,11 @@ def main() -> None:
     args = parse_args()
     serial_port = args.serial_port or find_usb_serial_port()
     if not serial_port:
-        raise SystemExit("No serial port found. Try --serial-port /dev/ttyUSB0")
+        raise SystemExit(
+            "No USB serial port found (detected: "
+            f"{list_serial_ports()}). Plug in the gripper adapter or pass "
+            "--serial-port /dev/ttyUSB0"
+        )
 
     controller = GripperController(serial_port, activate_on_start=not args.no_activate)
     server = GripperTCPServer((args.host, args.port), GripperRequestHandler, controller)
