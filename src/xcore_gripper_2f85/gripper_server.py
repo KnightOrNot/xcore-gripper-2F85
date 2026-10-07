@@ -16,8 +16,8 @@ from typing import Any, Dict, Optional, Tuple
 import serial.tools.list_ports
 
 try:  # installed package
-    from gripper_2f85 import robtiq_gripper_mdbsrtu as GRP
-except ImportError:  # executed as a loose script from src/gripper_2f85/
+    from xcore_gripper_2f85 import robtiq_gripper_mdbsrtu as GRP
+except ImportError:  # executed as a loose script from src/xcore_gripper_2f85/
     import robtiq_gripper_mdbsrtu as GRP  # type: ignore[no-redef]
 
 

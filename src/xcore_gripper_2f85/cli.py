@@ -5,11 +5,11 @@ The gripper itself hangs off a USB/RS485 port on the machine that runs
 ``gripper_server.py``.  This CLI only speaks the TCP JSON protocol, so it can
 run on any control PC on the same network::
 
-    uv run gripper status
-    uv run gripper open --speed 150
-    uv run gripper move --pos 100          # 0 = fully open, 255 = fully closed
-    uv run gripper move --closure 0.4      # 0.0 = fully open, 1.0 = fully closed
-    uv run gripper watch --interval 0.2    # real-time observation (Ctrl-C stops)
+    uv run xcore-gripper-2f85 status
+    uv run xcore-gripper-2f85 open --speed 150
+    uv run xcore-gripper-2f85 move --pos 100          # 0 = fully open, 255 = fully closed
+    uv run xcore-gripper-2f85 move --closure 0.4      # 0.0 = fully open, 1.0 = fully closed
+    uv run xcore-gripper-2f85 watch --interval 0.2    # real-time observation (Ctrl-C stops)
 
 Position conventions used everywhere in this file:
 
@@ -30,21 +30,21 @@ import time
 from typing import Any, Dict, List, Optional, Sequence, TextIO
 
 try:  # installed package
-    from gripper_2f85.gripper_client import (
+    from xcore_gripper_2f85.gripper_client import (
         DEFAULT_HOST,
         DEFAULT_PORT,
         DEFAULT_TIMEOUT,
         GripperConnectionError,
         send_command,
     )
-    from gripper_2f85.gripper_sdk import (
+    from xcore_gripper_2f85.gripper_sdk import (
         MAX_POSITION,
         GripperSDKError,
         Robotiq2F85,
         closure_to_pos,
         pos_to_closure,
     )
-except ImportError:  # executed as a loose script from src/gripper_2f85/
+except ImportError:  # executed as a loose script from src/xcore_gripper_2f85/
     from gripper_client import (  # type: ignore[no-redef]
         DEFAULT_HOST,
         DEFAULT_PORT,
@@ -124,7 +124,7 @@ def _add_motion_args(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="gripper",
+        prog="xcore-gripper-2f85",
         description="Control a Robotiq 2F-85 gripper through gripper_server.py",
     )
     # ``gripper 192.168.2.225 status`` stays valid for backwards compatibility.

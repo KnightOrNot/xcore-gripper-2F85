@@ -18,12 +18,12 @@ fi
 
 # Prefer an installed environment (uv sync / pip install -e .); fall back to the
 # source tree so the script also works before installation.
-if [[ -x .venv/bin/gripper-server ]]; then
-    exec .venv/bin/gripper-server "${args[@]}" "$@"
+if [[ -x .venv/bin/xcore-gripper-2f85-server ]]; then
+    exec .venv/bin/xcore-gripper-2f85-server "${args[@]}" "$@"
 fi
-if command -v gripper-server >/dev/null 2>&1; then
-    exec gripper-server "${args[@]}" "$@"
+if command -v xcore-gripper-2f85-server >/dev/null 2>&1; then
+    exec xcore-gripper-2f85-server "${args[@]}" "$@"
 fi
 
 exec env PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}" \
-    python3 -m gripper_2f85.gripper_server "${args[@]}" "$@"
+    python3 -m xcore_gripper_2f85.gripper_server "${args[@]}" "$@"

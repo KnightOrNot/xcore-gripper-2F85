@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.9"
 
 [[package]]
-name = "gripper-2f85"
+name = "xcore-gripper-2f85"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [

@@ -5,8 +5,8 @@ from __future__ import annotations
 import socket
 import unittest
 
-from gripper_2f85.gripper_client import GripperConnectionError, send_command
-from gripper_2f85.gripper_sdk import (
+from xcore_gripper_2f85.gripper_client import GripperConnectionError, send_command
+from xcore_gripper_2f85.gripper_sdk import (
     MAX_POSITION,
     GripperSDKError,
     Robotiq2F85,

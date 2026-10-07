@@ -1,5 +1,5 @@
 [project]
-name = "gripper-2f85"
+name = "xcore-gripper-2f85"
 version = "0.2.0"
 description = "Control a Robotiq 2F-85 gripper through a small TCP JSON server"
 readme = "README.md"
@@ -12,8 +12,10 @@ dependencies = [
 ]
 
 [project.scripts]
-gripper = "gripper_2f85.cli:main"
-gripper-server = "gripper_2f85.gripper_server:main"
+xcore-gripper-2f85 = "xcore_gripper_2f85.cli:main"
+gripper = "xcore_gripper_2f85.cli:main"
+xcore-gripper-2f85-server = "xcore_gripper_2f85.gripper_server:main"
+gripper-server = "xcore_gripper_2f85.gripper_server:main"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]

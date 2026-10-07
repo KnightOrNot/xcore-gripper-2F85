@@ -1,7 +1,7 @@
-# gripper-2F85
+# xcore-gripper-2F85
 
 通过 TCP JSON 协议控制 Robotiq 2F-85 夹爪。夹爪本体挂在**一台**机器的 USB/RS485 上，
-那台机器跑 `gripper_server.py`；任意同网段的控制电脑用 `uv run gripper` CLI 或 Python API 远程操作。
+那台机器跑 `gripper_server.py`；任意同网段的控制电脑用 `uv run xcore-gripper-2f85` CLI 或 Python API 远程操作。
 
 ```
 控制电脑  ──TCP:5005──▶  gripper_server.py  ──ModbusRTU/RS485──▶  2F-85
@@ -9,20 +9,20 @@
 ```
 
 本项目默认连接 `192.168.2.225:5005`（`GRIPPER_HOST` / `GRIPPER_PORT` 可改）。
-原始 Robotiq Modbus 实现在 `src/gripper_2f85/robtiq_gripper_mdbsrtu.py`（厂商 demo，未改动语义）。
+原始 Robotiq Modbus 实现在 `src/xcore_gripper_2f85/robtiq_gripper_mdbsrtu.py`（厂商 demo，未改动语义）。
 
 ## 安装
 
 ```bash
-cd xcore/gripper-2F85
+cd xcore/xcore-gripper-2F85
 uv sync                      # 安装 pyserial + 两个命令行入口
 ```
 
-安装后在本目录用 `uv run gripper ...`（或 `uv run gripper-server ...`）即可。
+安装后在本目录用 `uv run xcore-gripper-2f85 ...`（或 `uv run xcore-gripper-2f85-server ...`）即可。
 也可以不安装，直接用源码树：
 
 ```bash
-PYTHONPATH=src python3 -m gripper_2f85 status
+PYTHONPATH=src python3 -m xcore_gripper_2f85 status
 ```
 
 ## 服务端（夹爪 USB 所在机器）
@@ -33,39 +33,39 @@ PYTHONPATH=src python3 -m gripper_2f85 status
 GRIPPER_SERIAL_PORT=/dev/ttyUSB0 ./run_gripper.sh
 ```
 
-`run_gripper.sh` 会依次尝试 `.venv/bin/gripper-server`、`PATH` 里的
-`gripper-server`，最后回退到 `PYTHONPATH=src python3 -m gripper_2f85.gripper_server`。
+`run_gripper.sh` 会依次尝试 `.venv/bin/xcore-gripper-2f85-server`、`PATH` 里的
+`xcore-gripper-2f85-server`，最后回退到 `PYTHONPATH=src python3 -m xcore_gripper_2f85.gripper_server`。
 找不到 USB 串口时会直接报错并列出探测到的端口，不会误开 `/dev/ttyS*`。
 
 等价的手工启动：
 
 ```bash
-uv run gripper-server --host 0.0.0.0 --port 5005 --serial-port /dev/ttyUSB0
+uv run xcore-gripper-2f85-server --host 0.0.0.0 --port 5005 --serial-port /dev/ttyUSB0
 ```
 
 > 服务端只应有一个实例占用串口。同一时刻多个客户端可交替发送命令（服务端用锁串行化）。
 
 ## 客户端 CLI
 
-在本项目目录执行 `uv run gripper COMMAND [options]`：
+在本项目目录执行 `uv run xcore-gripper-2f85 COMMAND [options]`：
 
 ```bash
-uv run gripper status                     # 读一次状态
-uv run gripper activate                   # 激活（reset + enable）
-uv run gripper open  --speed 150          # 全开 (pos=0)
-uv run gripper close --force 80           # 全闭 (pos=255)，80 为中等夹持力
-uv run gripper move  --pos 100            # 原始位置 0..255
-uv run gripper move  --closure 0.4        # 归一化：0.0=全开，1.0=全闭
-uv run gripper move  --openness 0.6       # 归一化：1.0=全开，0.0=全闭
-uv run gripper move  --closure 1 --open-pos 2 --closed-pos 230   # 用实测机械行程
-uv run gripper watch  --interval 0.2      # 实时观测，Ctrl-C 停止
-uv run gripper watch  --duration 5 --format csv
-uv run gripper watch  --samples 20 --format jsonl | tee gripper.jsonl
+uv run xcore-gripper-2f85 status                     # 读一次状态
+uv run xcore-gripper-2f85 activate                   # 激活（reset + enable）
+uv run xcore-gripper-2f85 open  --speed 150          # 全开 (pos=0)
+uv run xcore-gripper-2f85 close --force 80           # 全闭 (pos=255)，80 为中等夹持力
+uv run xcore-gripper-2f85 move  --pos 100            # 原始位置 0..255
+uv run xcore-gripper-2f85 move  --closure 0.4        # 归一化：0.0=全开，1.0=全闭
+uv run xcore-gripper-2f85 move  --openness 0.6       # 归一化：1.0=全开，0.0=全闭
+uv run xcore-gripper-2f85 move  --closure 1 --open-pos 2 --closed-pos 230   # 用实测机械行程
+uv run xcore-gripper-2f85 watch  --interval 0.2      # 实时观测，Ctrl-C 停止
+uv run xcore-gripper-2f85 watch  --duration 5 --format csv
+uv run xcore-gripper-2f85 watch  --samples 20 --format jsonl | tee gripper.jsonl
 ```
 
 | 参数 | 说明 | 默认 |
 | --- | --- | --- |
-| `--host` / `--port` | 服务端地址；也可用位置参数 `uv run gripper 192.168.2.225 status`（兼容旧写法） | `192.168.2.225` / `5005` |
+| `--host` / `--port` | 服务端地址；也可用位置参数 `uv run xcore-gripper-2f85 192.168.2.225 status`（兼容旧写法） | `192.168.2.225` / `5005` |
 | `--speed` | 运动速度 0–255 | `255` |
 | `--force` | 夹持力 0–255，`0` 最轻 | `0` |
 | `--timeout` | 单条命令超时（秒） | `10` |
@@ -108,7 +108,7 @@ closure=0.012 (0=全开, 1=全闭) openness=0.988
 ## Python API
 
 ```python
-from gripper_2f85 import Robotiq2F85, closure_to_pos, pos_to_closure
+from xcore_gripper_2f85 import Robotiq2F85, closure_to_pos, pos_to_closure
 
 gripper = Robotiq2F85("192.168.2.225")     # 省略参数则用 GRIPPER_HOST/GRIPPER_PORT
 gripper.activate()
@@ -172,8 +172,8 @@ PYTHONPATH=src python3 -m unittest discover -s tests -t tests -v
    但它读的是 `robtiq_gripper_mdbsrtu.py` 里 `ReadGripperStatus` 的 `response[7]`，
    与厂商寄存器文档的对应关系没有逐字节核对；若后续需要电流 `gCU`、物体检测 `gOBJ`
    等字段，应重新核对该寄存器映射。
-2. `src/gripper_2f85/demo.py` 是厂商顶层的死循环脚本，只能用 `PYTHONPATH=src` 手动运行，
-   正常运行请用 `uv run gripper` CLI。
+2. `src/xcore_gripper_2f85/demo.py` 是厂商顶层的死循环脚本，只能用 `PYTHONPATH=src` 手动运行，
+   正常运行请用 `uv run xcore-gripper-2f85` CLI。
 3. 夹爪运动前请确认夹口内无手、无线缆；首次试夹建议 `--force 30` 左右，确认方向正确后再加大。
 4. `close` 不会真正到达协议端点 `255`（实测 ≈230），这是机械限位而非故障；
    需要判断"是否夹紧"时请用 `closure >= 0.85` 之类的阈值，不要判断 `== 255`。

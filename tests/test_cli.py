@@ -7,7 +7,7 @@ import io
 import json
 import unittest
 
-from gripper_2f85 import cli
+from xcore_gripper_2f85 import cli
 
 from fake_server import FakeGripperServer, ok_status
 

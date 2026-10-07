@@ -3,7 +3,7 @@
 
 Typical usage::
 
-    from gripper_2f85 import Robotiq2F85
+    from xcore_gripper_2f85 import Robotiq2F85
 
     gripper = Robotiq2F85("192.168.2.225")
     gripper.open()
@@ -16,7 +16,7 @@ Position conventions:
 * raw ``pos``        0 = fully open, 255 = fully closed.
 * ``closure``        0.0 = fully open, 1.0 = fully closed.  This is the same
   direction as the GELLO leader gripper axis computed by
-  ``gello.robots.dynamixel.DynamixelRobot`` from ``gripper_config``, so a leader
+  ``xcore_gello_software.robots.dynamixel.DynamixelRobot`` from ``gripper_config``, so a leader
   value maps onto :meth:`Robotiq2F85.move_closure` without extra inversion.
 * ``openness``       1.0 = fully open, 0.0 = fully closed.
 """
@@ -26,14 +26,14 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 try:  # installed package
-    from gripper_2f85.gripper_client import (
+    from xcore_gripper_2f85.gripper_client import (
         DEFAULT_HOST,
         DEFAULT_PORT,
         DEFAULT_TIMEOUT,
         GripperConnectionError,
         send_command,
     )
-except ImportError:  # executed as a loose script from src/gripper_2f85/
+except ImportError:  # executed as a loose script from src/xcore_gripper_2f85/
     from gripper_client import (  # type: ignore[no-redef]
         DEFAULT_HOST,
         DEFAULT_PORT,

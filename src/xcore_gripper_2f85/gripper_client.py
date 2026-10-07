@@ -12,7 +12,7 @@ Response::
     {"ok": true, "result": {"status_code": 249, "position_raw": 100, ...}}\\n
     {"ok": false, "error": "..."}\\n
 
-The richer command line interface lives in :mod:`gripper_2f85.cli`; this module
+The richer command line interface lives in :mod:`xcore_gripper_2f85.cli`; this module
 keeps the original ``gripper_client.py HOST cmd`` invocation working.
 """
 

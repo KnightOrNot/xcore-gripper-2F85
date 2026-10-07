@@ -2,7 +2,7 @@
 
 Public API::
 
-    from gripper_2f85 import Robotiq2F85, closure_to_pos, pos_to_closure
+    from xcore_gripper_2f85 import Robotiq2F85, closure_to_pos, pos_to_closure
 
     gripper = Robotiq2F85("192.168.2.225")   # defaults to GRIPPER_HOST/GRIPPER_PORT
     gripper.activate()
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Optional, Sequence
 
-from gripper_2f85.gripper_client import (
+from xcore_gripper_2f85.gripper_client import (
     COMMANDS,
     DEFAULT_HOST,
     DEFAULT_PORT,
@@ -22,7 +22,7 @@ from gripper_2f85.gripper_client import (
     GripperConnectionError,
     send_command,
 )
-from gripper_2f85.gripper_sdk import (
+from xcore_gripper_2f85.gripper_sdk import (
     MAX_POSITION,
     MAX_WIDTH_MM,
     GripperSDKError,
@@ -59,6 +59,6 @@ __all__ = [
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Console entry point (``gripper``)."""
 
-    from gripper_2f85.cli import main as cli_main
+    from xcore_gripper_2f85.cli import main as cli_main
 
     return cli_main(argv)
