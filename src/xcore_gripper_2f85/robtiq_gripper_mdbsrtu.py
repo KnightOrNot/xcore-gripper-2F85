@@ -90,6 +90,16 @@ class Gripper():
         # print(response[3],response[7],position)
         return(response[3],response[7],position)
 
+    def stop(self):
+        # rACT=1, rGTO=0: stop fingers without resetting or auto-releasing.
+        command = [0x09, 0x10, 0x03, 0xE8, 0x00, 0x03, 0x06,
+                   0x01, 0x00, 0x00, 0x00, 0x00, 0x00]
+        self.ser.write(bytes(CRC(command)))
+        time.sleep(0.1)
+        response = self.ser.read(8)
+        if response != bytes([0x09, 0x10, 0x03, 0xE8, 0x00, 0x03, 0x01, 0x30]):
+            raise IOError("Invalid Modbus stop acknowledgement")
+
     # 关闭串口连接
     def serclose(self):
         self.ser.close()

@@ -129,6 +129,31 @@ gripper.move_closure(gello_gripper, speed=150, force=80,
                      open_pos=2, closed_pos=230)
 ```
 
+## 连续夹爪跟随
+
+`move` 仍等待到位，适用于一次性动作。连续跟随使用 `set_target`：仅等待串口
+事务及一次反馈，不等待手指到位，运动中可以接收新目标。相同目标刷新看门狗，
+不会重复发送运动命令。
+
+```python
+gripper.follow_status()  # 只读：检查 streaming=True、激活与反馈
+gripper.set_target_closure(0.4, speed=150, force=0, stale_timeout=1.5)
+# 持续更新，即使闭合度不变也需刷新；结束时显式停止
+gripper.stop()
+```
+
+`set_target` 必须在 `stale_timeout` 内持续刷新（允许 0.5～10 s，默认 1.5 s）。
+断流后服务端尝试停止手指并锁定该跟随流；调用 `stop()` 或重启服务可解除。
+串口读取失败也会触发停止并返回错误。跟随期间拒绝手动 `move/open/close/activate`，
+防止两套命令互相覆盖。
+
+`stop` 保持激活、清除 rGTO，不执行复位或自动释放；寄存器含义参见
+[Robotiq 官方控制说明](https://assets.robotiq.com/website-assets/support_documents/document/online/2F-85_2F-140_TM_InstructionManual_HTML5_20190503.zip/2F-85_2F-140_TM_InstructionManual_HTML5/Content/4.%20Control.htm)。
+停止请求和看门狗仍依赖串口通信，不替代硬件急停。新增连续跟随接口尚未实机验收。
+
+统一 GELLO 跟随由 `xcore-sdk-python/scripts/start_gello_follow.sh --gripper-host HOST`
+启动，该客户端独占 GELLO 串口；夹爪服务只访问自己的 RS485 串口。
+
 ## 环境变量
 
 | 变量 | 作用 |
@@ -147,7 +172,16 @@ gripper.move_closure(gello_gripper, speed=150, force=80,
 {"cmd": "move", "pos": 100, "speed": 255, "force": 0, "timeout": 10.0}
 ```
 
-`cmd` ∈ `activate` | `status` | `open` | `close` | `move`。
+`cmd` ∈ `activate` | `status` | `open` | `close` | `move` |
+`follow_status` | `set_target` | `stop`。
+
+连续跟随请求示例：
+
+```json
+{"cmd": "set_target", "pos": 100, "speed": 150, "force": 0, "stale_timeout": 1.5}
+```
+
+`follow_status` 的结果还包含 `streaming: true` 与 `stream_error`。
 
 响应：
 

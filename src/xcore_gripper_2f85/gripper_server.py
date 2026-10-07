@@ -7,7 +7,9 @@ The control PC can then send JSON commands over the network.
 
 import argparse
 import json
+import math
 import os
+import signal
 import socketserver
 import threading
 import time
@@ -65,11 +67,18 @@ class GripperController:
     def __init__(self, port: str, activate_on_start: bool = True) -> None:
         self._lock = threading.Lock()
         self._gripper = GRP.Gripper(port)
+        self._stream_deadline = None
+        self._stream_error = None
+        self._last_target = None
+        self._closing = threading.Event()
+        self._watchdog_thread = threading.Thread(target=self._watchdog, daemon=True)
         if activate_on_start:
             self.activate()
+        self._watchdog_thread.start()
 
     def activate(self, timeout: float = 10.0) -> Dict[str, Any]:
         with self._lock:
+            self._reject_stream_unlocked()
             self._gripper.ClearrACT()
             self._gripper.activate()
             deadline = time.monotonic() + timeout
@@ -90,6 +99,7 @@ class GripperController:
         force = clamp_byte(force, "force")
 
         with self._lock:
+            self._reject_stream_unlocked()
             self._gripper.grip([pos, speed, force])
             deadline = time.monotonic() + timeout
             status = self._read_status_unlocked()
@@ -104,8 +114,91 @@ class GripperController:
             return self._read_status_unlocked()
 
     def close(self) -> None:
+        self._closing.set()
+        self._watchdog_thread.join(timeout=2)
         with self._lock:
-            self._gripper.serclose()
+            try:
+                if self._stream_deadline is not None:
+                    self._stop_unlocked()
+            finally:
+                self._gripper.serclose()
+
+    def follow_status(self) -> Dict[str, Any]:
+        with self._lock:
+            return dict(
+                self._read_status_unlocked(),
+                streaming=True,
+                stream_error=self._stream_error,
+            )
+
+    def set_target(
+        self,
+        pos: int,
+        speed: int = 150,
+        force: int = 0,
+        stale_timeout: float = 1.5,
+    ) -> Dict[str, Any]:
+        """Accept a new target without waiting for the fingers to reach it.
+
+        Repeated targets refresh the watchdog and read feedback without issuing
+        another grip command. Serial transactions are still serialized.
+        """
+        target = tuple(
+            clamp_byte(v, name)
+            for v, name in ((pos, "pos"), (speed, "speed"), (force, "force"))
+        )
+        if not math.isfinite(stale_timeout) or not 0.5 <= stale_timeout <= 10:
+            raise ValueError("stale_timeout must be in [0.5,10] seconds")
+        with self._lock:
+            if self._closing.is_set() or self._stream_error:
+                raise RuntimeError(self._stream_error or "Gripper is closing")
+            try:
+                self._stream_deadline = time.monotonic() + stale_timeout
+                if target != self._last_target:
+                    self._gripper.grip(list(target))
+                    self._last_target = target
+                state = self._read_status_unlocked()
+                if state["status_code"] & 0x31 != 0x31:
+                    raise RuntimeError("Gripper lost activation")
+                return state
+            except Exception as exc:
+                self._stream_error = str(exc)
+                try:
+                    self._stop_unlocked()
+                except Exception as stop_exc:
+                    self._stream_error += f"; stop failed: {stop_exc}"
+                raise
+
+    def stop(self) -> Dict[str, Any]:
+        with self._lock:
+            self._stop_unlocked()
+            self._stream_error = None
+            return self._read_status_unlocked()
+
+    def _stop_unlocked(self) -> None:
+        self._stream_deadline = None
+        self._last_target = None
+        self._gripper.stop()
+
+    def _reject_stream_unlocked(self) -> None:
+        if self._stream_deadline is not None:
+            raise RuntimeError(
+                "Gripper following is active; stop it before manual commands"
+            )
+
+    def _watchdog(self) -> None:
+        while not self._closing.wait(0.05):
+            with self._lock:
+                if (
+                    self._stream_deadline is not None
+                    and time.monotonic() > self._stream_deadline
+                ):
+                    self._stream_error = "Gripper target stream timed out"
+                    try:
+                        self._stop_unlocked()
+                    except Exception as exc:
+                        self._stream_error += f"; stop failed: {exc}"
+                    print(self._stream_error, flush=True)
 
     def _read_status_unlocked(self) -> Dict[str, Any]:
         status_code, position_raw, position_mm = self._gripper.ReadGripperStatus()
@@ -154,6 +247,17 @@ class GripperRequestHandler(socketserver.StreamRequestHandler):
             result = controller.activate(timeout=float(request.get("timeout", 10.0)))
         elif command == "status":
             result = controller.status()
+        elif command == "follow_status":
+            result = controller.follow_status()
+        elif command == "set_target":
+            result = controller.set_target(
+                pos=request.get("pos"),
+                speed=request.get("speed", 150),
+                force=request.get("force", 0),
+                stale_timeout=float(request.get("stale_timeout", 1.5)),
+            )
+        elif command == "stop":
+            result = controller.stop()
         elif command == "open":
             result = controller.move(
                 pos=0,
@@ -176,7 +280,10 @@ class GripperRequestHandler(socketserver.StreamRequestHandler):
                 timeout=float(request.get("timeout", 10.0)),
             )
         else:
-            raise ValueError("cmd must be one of: activate, status, open, close, move")
+            raise ValueError(
+                "cmd must be activate, status, open, close, move, "
+                "follow_status, set_target or stop"
+            )
 
         return {"ok": True, "result": result}
 
@@ -185,7 +292,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Robotiq 2F gripper TCP server")
     parser.add_argument("--host", default="0.0.0.0", help="IP to listen on")
     parser.add_argument("--port", type=int, default=5005, help="TCP port to listen on")
-    parser.add_argument("--serial-port", help="Gripper serial port, for example /dev/ttyUSB0")
+    parser.add_argument(
+        "--serial-port", help="Gripper serial port, for example /dev/ttyUSB0"
+    )
     parser.add_argument(
         "--no-activate",
         action="store_true",
@@ -208,13 +317,21 @@ def main() -> None:
     server = GripperTCPServer((args.host, args.port), GripperRequestHandler, controller)
     print(f"Gripper server listening on {args.host}:{args.port}, serial={serial_port}")
 
+    def interrupt(*_args: Any) -> None:
+        raise KeyboardInterrupt
+
+    old_term = signal.signal(signal.SIGTERM, interrupt)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("Stopping gripper server")
     finally:
-        server.server_close()
-        controller.close()
+        try:
+            server.server_close()
+            controller.close()
+        finally:
+            signal.signal(signal.SIGTERM, old_term)
 
 
 if __name__ == "__main__":

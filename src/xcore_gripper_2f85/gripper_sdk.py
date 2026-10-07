@@ -115,6 +115,33 @@ class Robotiq2F85:
     def status(self, timeout: Optional[float] = None) -> Dict[str, Any]:
         return self._command("status", timeout=timeout)
 
+    def follow_status(self, timeout: Optional[float] = None) -> Dict[str, Any]:
+        return self._command("follow_status", timeout=timeout)
+
+    def set_target_closure(
+        self,
+        closure: float,
+        speed: int = 150,
+        force: int = 0,
+        open_pos: int = 0,
+        closed_pos: int = MAX_POSITION,
+        stale_timeout: float = 1.5,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Update the target while moving; refresh before stale_timeout expires."""
+        return self._command(
+            "set_target",
+            timeout=timeout,
+            pos=closure_to_pos(closure, open_pos=open_pos, closed_pos=closed_pos),
+            speed=speed,
+            force=force,
+            stale_timeout=stale_timeout,
+        )
+
+    def stop(self, timeout: Optional[float] = None) -> Dict[str, Any]:
+        """Stop finger motion without reset or automatic release."""
+        return self._command("stop", timeout=timeout)
+
     def open(
         self,
         speed: int = 255,
