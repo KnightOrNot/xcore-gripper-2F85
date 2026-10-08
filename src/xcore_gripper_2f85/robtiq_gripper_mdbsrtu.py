@@ -55,6 +55,11 @@ class Gripper():
         time.sleep(0.1)
         # 读取激活指令返回数据
         response = self.ser.read(7)
+        if len(response) != 7:
+            raise IOError(
+                f"Incomplete Modbus activation reply: expected 7 bytes, got {len(response)}; "
+                "check gripper port, power and RS485 connection"
+            )
         if response[3]== 0x31: #0x31=
             return True
         return False
@@ -86,6 +91,11 @@ class Gripper():
         # 0xF9 249 完成动作到制定位置
 
         response = self.ser.read(11)
+        if len(response) != 11:
+            raise IOError(
+                f"Incomplete Modbus status reply: expected 11 bytes, got {len(response)}; "
+                "check gripper port, power and RS485 connection"
+            )
         position=round((-50/255)*response[7]+50,2)
         # print(response[3],response[7],position)
         return(response[3],response[7],position)

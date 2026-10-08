@@ -83,6 +83,35 @@ class FollowControllerTest(unittest.TestCase):
 
 
 class StopWireTest(unittest.TestCase):
+    def test_incomplete_feedback_reports_io_error_instead_of_index_error(self):
+        hardware = object.__new__(wire.Gripper)
+        hardware.ser = Mock()
+        for method, expected in [(hardware.isavtivated, 7), (hardware.ReadGripperStatus, 11)]:
+            for size in [0, 3, expected - 1]:
+                with self.subTest(method=method.__name__, size=size):
+                    hardware.ser.read.return_value = bytes(size)
+                    with patch.object(wire.time, "sleep"):
+                        with self.assertRaisesRegex(IOError, "Incomplete Modbus"):
+                            method()
+
+    def test_complete_feedback_retains_activation_and_position_results(self):
+        hardware = object.__new__(wire.Gripper)
+        hardware.ser = Mock()
+        hardware.ser.read.return_value = bytes([9, 4, 2, 0x31, 0, 0, 0])
+        with patch.object(wire.time, "sleep"):
+            self.assertTrue(hardware.isavtivated())
+        hardware.ser.read.return_value = bytes([9, 4, 6, 0xF9, 0, 0, 0, 100, 0, 0, 0])
+        with patch.object(wire.time, "sleep"):
+            self.assertEqual(hardware.ReadGripperStatus(), (0xF9, 100, 30.39))
+
+    def test_failed_activation_closes_serial_before_propagating_error(self):
+        hardware = Mock()
+        hardware.isavtivated.side_effect = IOError("Incomplete Modbus activation reply")
+        with patch("xcore_gripper_2f85.gripper_server.GRP.Gripper", return_value=hardware):
+            with self.assertRaisesRegex(IOError, "Incomplete Modbus"):
+                GripperController("fake")
+        hardware.serclose.assert_called_once()
+
     def test_stop_clears_goto_without_reset_or_release_and_checks_ack(self):
         hardware = object.__new__(wire.Gripper)
         hardware.ser = Mock()

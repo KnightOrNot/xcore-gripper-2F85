@@ -8,7 +8,6 @@ The control PC can then send JSON commands over the network.
 import argparse
 import json
 import math
-import os
 import signal
 import socketserver
 import threading
@@ -73,7 +72,11 @@ class GripperController:
         self._closing = threading.Event()
         self._watchdog_thread = threading.Thread(target=self._watchdog, daemon=True)
         if activate_on_start:
-            self.activate()
+            try:
+                self.activate()
+            except BaseException:
+                self._gripper.serclose()
+                raise
         self._watchdog_thread.start()
 
     def activate(self, timeout: float = 10.0) -> Dict[str, Any]:
@@ -313,7 +316,10 @@ def main() -> None:
             "--serial-port /dev/ttyUSB0"
         )
 
-    controller = GripperController(serial_port, activate_on_start=not args.no_activate)
+    try:
+        controller = GripperController(serial_port, activate_on_start=not args.no_activate)
+    except OSError as exc:
+        raise SystemExit(f"Cannot initialize gripper on {serial_port}: {exc}") from exc
     server = GripperTCPServer((args.host, args.port), GripperRequestHandler, controller)
     print(f"Gripper server listening on {args.host}:{args.port}, serial={serial_port}")
 
