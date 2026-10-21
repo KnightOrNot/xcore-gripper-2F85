@@ -40,7 +40,7 @@ GRIPPER_SERIAL_PORT=/dev/ttyUSB0 ./run_gripper.sh
 服务必须运行在实际连接夹爪 USB/RS485 的机器上。GELLO 的 USB 转串口
 不能用于 Robotiq；未收到完整激活或状态回复时，服务报告 Modbus 回复长度
 不足并提示检查串口、电源和 RS485，初始化失败会释放串口。
-`xcore-controller/start_gripper.sh` 默认通过 SSH 管理 `.225` 的后台服务；
+`xcore-controller/scripts/start_gripper.sh` 默认通过 SSH 管理 `.225` 的后台服务；
 其本机模式要求 `--local --serial-port`，不使用自动串口探测。
 
 等价的手工启动：
