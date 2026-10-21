@@ -27,15 +27,13 @@ import csv
 import json
 import sys
 import time
-from typing import Any, Dict, List, Optional, Sequence, TextIO
+from pathlib import Path
+from typing import Any, Dict, Optional, Sequence
 
 try:  # installed package
+    from xcore_gripper_2f85.configuration import Config, load_config
     from xcore_gripper_2f85.gripper_client import (
-        DEFAULT_HOST,
-        DEFAULT_PORT,
-        DEFAULT_TIMEOUT,
         GripperConnectionError,
-        send_command,
     )
     from xcore_gripper_2f85.gripper_sdk import (
         MAX_POSITION,
@@ -45,12 +43,9 @@ try:  # installed package
         pos_to_closure,
     )
 except ImportError:  # executed as a loose script from src/xcore_gripper_2f85/
+    from configuration import Config, load_config  # type: ignore[no-redef]
     from gripper_client import (  # type: ignore[no-redef]
-        DEFAULT_HOST,
-        DEFAULT_PORT,
-        DEFAULT_TIMEOUT,
         GripperConnectionError,
-        send_command,
     )
     from gripper_sdk import (  # type: ignore[no-redef]
         MAX_POSITION,
@@ -81,23 +76,34 @@ def decode_status(code: Any) -> str:
     return STATUS_LABELS.get(code, "未知")
 
 
+_CONFIG: Optional[Config] = None
+
+
+def _active_config() -> Config:
+    global _CONFIG
+    if _CONFIG is None:
+        _CONFIG = load_config()
+    return _CONFIG
+
+
 def _add_connection_args(parser: argparse.ArgumentParser) -> None:
+    config = _active_config()
     parser.add_argument(
         "--host",
         default=None,
-        help=f"control PC running gripper_server.py (default: {DEFAULT_HOST})",
+        help=f"control PC running gripper_server.py (default: {config.client.host})",
     )
     parser.add_argument(
         "--port",
         type=int,
         default=None,
-        help=f"TCP port of gripper_server.py (default: {DEFAULT_PORT})",
+        help=f"TCP port of gripper_server.py (default: {config.client.port})",
     )
     parser.add_argument(
         "--timeout",
         type=float,
-        default=DEFAULT_TIMEOUT,
-        help=f"per-command timeout in seconds (default: {DEFAULT_TIMEOUT:g})",
+        default=config.client.timeout_s,
+        help=f"per-command timeout in seconds (default: {config.client.timeout_s:g})",
     )
     parser.add_argument(
         "--json",
@@ -108,24 +114,35 @@ def _add_connection_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_motion_args(parser: argparse.ArgumentParser) -> None:
+    config = _active_config()
     parser.add_argument(
         "--speed",
         type=int,
-        default=255,
-        help="motion speed 0-255 (default: 255)",
+        default=config.client.speed,
+        help=f"motion speed 0-255 (default: {config.client.speed})",
     )
     parser.add_argument(
         "--force",
         type=int,
-        default=0,
-        help="gripping force 0-255; 0 is the gentlest value (default: 0)",
+        default=config.client.force,
+        help="gripping force 0-255; 0 is the gentlest value "
+        f"(default: {config.client.force})",
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(config: Optional[Config] = None) -> argparse.ArgumentParser:
+    global _CONFIG
+    if config is not None:
+        _CONFIG = config
+    config = _active_config()
     parser = argparse.ArgumentParser(
         prog="xcore-gripper-2f85",
         description="Control a Robotiq 2F-85 gripper through gripper_server.py",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        help="TOML defaults file (default: <repository>/config/default.toml)",
     )
     # ``gripper 192.168.2.225 status`` stays valid for backwards compatibility.
     parser.add_argument(
@@ -173,16 +190,16 @@ def build_parser() -> argparse.ArgumentParser:
     move.add_argument(
         "--open-pos",
         type=int,
-        default=0,
+        default=config.motion.open_pos,
         help="raw position treated as fully open when using --closure/--openness "
-        "(default: 0; measured mechanical open is about 2)",
+        f"(default: {config.motion.open_pos}; measured mechanical open is about 2)",
     )
     move.add_argument(
         "--closed-pos",
         type=int,
-        default=MAX_POSITION,
+        default=config.motion.closed_pos,
         help="raw position treated as fully closed when using --closure/--openness "
-        f"(default: {MAX_POSITION}; measured mechanical closed is about 230)",
+        f"(default: {config.motion.closed_pos}; measured mechanical closed is about 230)",
     )
 
     watch = sub.add_parser(
@@ -192,8 +209,8 @@ def build_parser() -> argparse.ArgumentParser:
     watch.add_argument(
         "--interval",
         type=float,
-        default=0.2,
-        help="sampling period in seconds (default: 0.2)",
+        default=config.watch.interval_s,
+        help=f"sampling period in seconds (default: {config.watch.interval_s:g})",
     )
     watch.add_argument(
         "--duration",
@@ -218,8 +235,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _resolve_connection(args: argparse.Namespace) -> Robotiq2F85:
-    host = args.host or args.host_pos or DEFAULT_HOST
-    port = args.port if args.port is not None else DEFAULT_PORT
+    config = _active_config()
+    host = args.host or args.host_pos or config.client.host
+    port = args.port if args.port is not None else config.client.port
     return Robotiq2F85(host, port=port, timeout=args.timeout)
 
 
@@ -264,9 +282,7 @@ def _target_pos(args: argparse.Namespace) -> int:
         value = args.closure
     else:
         value = 1.0 - args.openness
-    return closure_to_pos(
-        value, open_pos=args.open_pos, closed_pos=args.closed_pos
-    )
+    return closure_to_pos(value, open_pos=args.open_pos, closed_pos=args.closed_pos)
 
 
 def _run_watch(gripper: Robotiq2F85, args: argparse.Namespace) -> int:
@@ -354,12 +370,23 @@ def _run_watch(gripper: Robotiq2F85, args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _config_path(argv: Sequence[str]) -> Optional[Path]:
+    for index, value in enumerate(argv):
+        if value == "--config" and index + 1 < len(argv):
+            return Path(argv[index + 1])
+        if value.startswith("--config="):
+            return Path(value.split("=", 1)[1])
+    return None
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
-    if args.host is None and args.host_pos is None:
-        args.host = DEFAULT_HOST
-    if args.port is None:
-        args.port = DEFAULT_PORT
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    try:
+        config = load_config(_config_path(arguments))
+    except (OSError, ValueError) as exc:
+        print(f"invalid configuration: {exc}", file=sys.stderr)
+        return EXIT_FAILURE
+    args = build_parser(config).parse_args(arguments)
 
     try:
         gripper = _resolve_connection(args)

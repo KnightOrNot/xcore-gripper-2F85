@@ -1,0 +1,31 @@
+# xcore-gripper-2f85 默认参数。
+#
+# 优先级：显式命令行参数 > 环境变量（GRIPPER_HOST / GRIPPER_PORT）> 本文件。
+# 服务端与客户端共用本文件；远端部署时可用 --config 指定现场配置。
+# 夹爪串口必须使用远端 by-id 路径，不能与 GELLO 主臂串口混用。
+
+[server]
+# 服务监听地址。只在可信网络内使用；本机单机调试可改为 127.0.0.1。
+host = "0.0.0.0"
+port = 5005
+# 空字符串表示自动检测唯一的 USB 串口。
+serial_port = ""
+# 启动时是否执行 Robotiq 激活（复位并启用）。
+activate = true
+
+[client]
+# 运行 gripper_server.py 的主机；默认是现场 Linux 服务机。
+host = "192.168.2.225"
+port = 5005
+timeout_s = 10.0
+# 运动命令默认值；0 是最轻的夹持力。
+speed = 255
+force = 0
+
+[motion]
+# 原始位置约定：0 = 全开，255 = 全闭。
+open_pos = 0
+closed_pos = 255
+
+[watch]
+interval_s = 0.2

@@ -10,16 +10,20 @@ import json
 import math
 import signal
 import socketserver
+import sys
 import threading
 import time
-from typing import Any, Dict, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 import serial.tools.list_ports
 
 try:  # installed package
     from xcore_gripper_2f85 import robtiq_gripper_mdbsrtu as GRP
+    from xcore_gripper_2f85.configuration import load_config
 except ImportError:  # executed as a loose script from src/xcore_gripper_2f85/
     import robtiq_gripper_mdbsrtu as GRP  # type: ignore[no-redef]
+    from configuration import load_config  # type: ignore[no-redef]
 
 
 MOVING_STATUS = 0x39
@@ -291,19 +295,43 @@ class GripperRequestHandler(socketserver.StreamRequestHandler):
         return {"ok": True, "result": result}
 
 
-def parse_args() -> argparse.Namespace:
+def config_path(argv: Sequence[str]) -> Path | None:
+    for index, value in enumerate(argv):
+        if value == "--config" and index + 1 < len(argv):
+            return Path(argv[index + 1])
+        if value.startswith("--config="):
+            return Path(value.split("=", 1)[1])
+    return None
+
+
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    try:
+        config = load_config(config_path(arguments))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"invalid configuration: {exc}") from exc
     parser = argparse.ArgumentParser(description="Robotiq 2F gripper TCP server")
-    parser.add_argument("--host", default="0.0.0.0", help="IP to listen on")
-    parser.add_argument("--port", type=int, default=5005, help="TCP port to listen on")
     parser.add_argument(
-        "--serial-port", help="Gripper serial port, for example /dev/ttyUSB0"
+        "--config",
+        type=Path,
+        help="TOML defaults file (default: <repository>/config/default.toml)",
+    )
+    parser.add_argument("--host", default=config.server.host, help="IP to listen on")
+    parser.add_argument(
+        "--port", type=int, default=config.server.port, help="TCP port to listen on"
+    )
+    parser.add_argument(
+        "--serial-port",
+        default=config.server.serial_port or None,
+        help="Gripper serial port, for example /dev/ttyUSB0",
     )
     parser.add_argument(
         "--no-activate",
         action="store_true",
+        default=not config.server.activate,
         help="Do not activate the gripper when the server starts",
     )
-    return parser.parse_args()
+    return parser.parse_args(arguments)
 
 
 def main() -> None:
@@ -317,7 +345,9 @@ def main() -> None:
         )
 
     try:
-        controller = GripperController(serial_port, activate_on_start=not args.no_activate)
+        controller = GripperController(
+            serial_port, activate_on_start=not args.no_activate
+        )
     except OSError as exc:
         raise SystemExit(f"Cannot initialize gripper on {serial_port}: {exc}") from exc
     server = GripperTCPServer((args.host, args.port), GripperRequestHandler, controller)

@@ -11,6 +11,16 @@
 本项目默认连接 `192.168.2.225:5005`（`GRIPPER_HOST` / `GRIPPER_PORT` 可改）。
 原始 Robotiq Modbus 实现在 `src/xcore_gripper_2f85/robtiq_gripper_mdbsrtu.py`（厂商 demo，未改动语义）。
 
+## 配置与文档
+
+服务端和客户端的默认 host、port、串口与运动参数位于
+[config/default.toml](config/default.toml)，用 `--config FILE` 覆盖；
+环境变量 `GRIPPER_HOST` / `GRIPPER_PORT` 优先于文件。
+
+- [架构](docs/index.md)、[安装部署](docs/installation.md)
+- [CLI](docs/reference/cli.md)、[配置](docs/reference/config.md)、[排障](docs/reference/errors.md)
+- [贡献指南](CONTRIBUTING.md)、[更新记录](CHANGELOG.md)
+
 ## 安装
 
 ```bash
